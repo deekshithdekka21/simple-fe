@@ -34,7 +34,7 @@ PAGE = """
   </style>
 </head>
 <body>
-  <h1>Contact me</h1>
+ <h1>Get in touch</h1>
   {% if status == "sent" %}<div class="msg ok">Thanks! Your message was sent.</div>{% endif %}
   {% if error %}<div class="msg err">{{ error }}</div>{% endif %}
   <form method="post" action="{{ url_for('submit') }}">
