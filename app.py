@@ -1,6 +1,7 @@
 import os
 import logging
 
+import psycopg
 import resend
 from resend.exceptions import ResendError
 from flask import Flask, request, redirect, url_for, render_template_string
@@ -14,6 +15,33 @@ logging.basicConfig(level=logging.INFO)
 # TO_EMAIL       : where submissions are sent (your own email)
 # FROM_EMAIL     : sender; onboarding@resend.dev works for testing
 FROM_EMAIL = os.environ.get("FROM_EMAIL", "Contact Form <onboarding@resend.dev>")
+
+# DATABASE_URL : Postgres connection string. Optional: when it isn't set
+# (for example on Render), submissions are only emailed, not saved.
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+
+def save_submission(name, email, message):
+    """Store one submission in Postgres. Creates the table the first time."""
+    if not DATABASE_URL:
+        return
+    with psycopg.connect(DATABASE_URL) as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS submissions (
+                id         SERIAL PRIMARY KEY,
+                name       TEXT NOT NULL,
+                email      TEXT NOT NULL,
+                message    TEXT NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+            """
+        )
+        conn.execute(
+            "INSERT INTO submissions (name, email, message) VALUES (%s, %s, %s)",
+            (name, email, message),
+        )
+    app.logger.info("Submission saved to database")
 
 
 PAGE = """
@@ -34,7 +62,7 @@ PAGE = """
   </style>
 </head>
 <body>
- <h1>Get in touch with 21Deployers - According to the Theorem</h1>
+  <h1>Get in touch</h1>
   {% if status == "sent" %}<div class="msg ok">Thanks! Your message was sent.</div>{% endif %}
   {% if error %}<div class="msg err">{{ error }}</div>{% endif %}
   <form method="post" action="{{ url_for('submit') }}">
@@ -74,6 +102,12 @@ def submit():
     if not api_key or not to_email:
         app.logger.error("RESEND_API_KEY or TO_EMAIL is not set")
         return render_template_string(PAGE, status=None, error="Email is not configured on the server."), 500
+
+    try:
+        save_submission(name, email, message)
+    except psycopg.Error as error:
+        app.logger.error("Database error: %s", error)
+        return render_template_string(PAGE, status=None, error="Sorry, the message could not be saved."), 500
 
     resend.api_key = api_key
     params = {
