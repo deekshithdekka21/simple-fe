@@ -2,8 +2,6 @@
 
 A small contact form that emails each submission to the site owner through the [Resend](https://resend.com) API. It's containerized with Docker and deployed on Render, with every push to `main` going live automatically.
 
-**Live demo:** https://YOUR-SERVICE.onrender.com
-(Free Render instance: the first visit after 15 minutes idle takes about a minute to wake up.)
 
 ## How it works
 
